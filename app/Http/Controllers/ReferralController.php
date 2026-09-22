@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Master;
+use App\Models\Referral;
+use App\Models\ReferralEarning;
 use App\Services\Referral\ReferralService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,5 +39,38 @@ class ReferralController extends Controller
             ],
             'created' => $referral->wasRecentlyCreated,
         ], $referral->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function my(Request $request): JsonResponse
+    {
+        /** @var Master|null $master */
+        $master = $request->attributes->get('current_master');
+
+        if ($master === null) {
+            return response()->json(['message' => 'Master not found. Set X-Master-Id header.'], 401);
+        }
+
+        $referrals = Referral::query()
+            ->where('referrer_master_id', $master->id)
+            ->with('referredMaster')
+            ->orderBy('created_at')
+            ->get();
+
+        $earnedByReferralId = ReferralEarning::query()
+            ->whereIn('referral_id', $referrals->pluck('id'))
+            ->get()
+            ->groupBy('referral_id')
+            ->map(fn ($items) => (int) $items->sum('amount'));
+
+        $items = $referrals->map(function (Referral $referral) use ($earnedByReferralId) {
+            return [
+                'name' => $referral->referredMaster->name,
+                'attached_at' => $referral->created_at?->toIso8601String(),
+                'counted' => $referral->status === Referral::STATUS_REWARDED,
+                'earned_amount' => $earnedByReferralId->get($referral->id, 0),
+            ];
+        });
+
+        return response()->json(['referrals' => $items]);
     }
 }
