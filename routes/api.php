@@ -21,4 +21,4 @@ Route::get('/ping', fn () => ['ok' => true]);
 
 Route::post('/referrals/attach', [ReferralController::class, 'attach']);
 Route::get('/referrals/my', [ReferralController::class, 'my']);
-// TODO: GET  /api/referrals/earnings
+Route::get('/referrals/earnings', [ReferralController::class, 'earnings']);

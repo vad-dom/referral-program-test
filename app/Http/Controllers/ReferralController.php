@@ -73,4 +73,29 @@ class ReferralController extends Controller
 
         return response()->json(['referrals' => $items]);
     }
+
+    public function earnings(Request $request): JsonResponse
+    {
+        /** @var Master|null $master */
+        $master = $request->attributes->get('current_master');
+
+        if ($master === null) {
+            return response()->json(['message' => 'Master not found. Set X-Master-Id header.'], 401);
+        }
+
+        $earningsQuery = ReferralEarning::query()
+            ->where('referrer_master_id', $master->id);
+
+        $countedReferrals = Referral::query()
+            ->where('referrer_master_id', $master->id)
+            ->where('status', Referral::STATUS_REWARDED)
+            ->count();
+
+        return response()->json([
+            'total_accrued' => (int) (clone $earningsQuery)->sum('amount'),
+            'pending' => (int) (clone $earningsQuery)->where('status', ReferralEarning::STATUS_PENDING)->sum('amount'),
+            'paid' => (int) (clone $earningsQuery)->where('status', ReferralEarning::STATUS_PAID)->sum('amount'),
+            'counted_referrals' => $countedReferrals,
+        ]);
+    }
 }
